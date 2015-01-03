@@ -30,6 +30,14 @@
 						@endforeach
 					</select>
 		        </div>
+                <div class="form-group">
+                    <label for="forgeVersion">Forge Version</label>
+                    <select class="form-control" name="forgeVersion">
+						@foreach ($forgeVersion as $forgeV)
+						<option value="{{ $forgeV->forge }}:{{ $forgeV->minecraft }}">{{ $forgeV->forge }}</option>
+						@endforeach
+					</select>
+                </div>
 		        <div class="form-group">
 		            <label for="clone">Clone Build</label>
 		            <select class="form-control" name="clone">

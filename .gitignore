@@ -5,4 +5,8 @@ composer.lock
 /app/config
 public/resources/
 public/vendor
+bootstrap/compiled.php
+public/forge.txt
+public/mods/
+public/natives/
 app/database/*.sqlite
