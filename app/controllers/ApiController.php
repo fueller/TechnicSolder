@@ -302,6 +302,7 @@ class APIController extends BaseController {
 		$response['minecraft'] = $build->minecraft;
 		$response['minecraft_md5'] = $build->minecraft_md5;
 		$response['forge'] = $build->forge;
+        $response['forgeVersion'] = $build->forgeVersion;
 		$response['mods'] = array();
 
 		foreach ($build->modversions as $modversion)

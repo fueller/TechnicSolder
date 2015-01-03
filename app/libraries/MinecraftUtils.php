@@ -13,6 +13,12 @@ class MinecraftUtils {
 
 		return $response;
 	}
+    
+    public static function getForge() {
+        $url = 'http://solder2.mechzone.net/forge.txt';;
+        $response = UrlUtils::get_url_contents($url, 15);
+        return json_decode($response);
+    }
 
 	public static function getMinecraftVersions() {
 		$response = '';

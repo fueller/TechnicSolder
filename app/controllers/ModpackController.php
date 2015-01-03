@@ -89,11 +89,13 @@ class ModpackController extends BaseController {
 			return Redirect::to('modpack');
 
 		$minecraft = MinecraftUtils::getMinecraft();
+        $forgeVersion = MinecraftUtils::getForge();
 
 		return View::make('modpack.build.create')
 			->with(array(
 				'modpack' => $modpack,
-				'minecraft' => $minecraft
+				'minecraft' => $minecraft,
+                'forgeVersion' => $forgeVersion
 				));
 	}
 
@@ -125,6 +127,10 @@ class ModpackController extends BaseController {
 
 		$build->minecraft = $minecraft[0];
 		$build->minecraft_md5 = $minecraft[1];
+        
+        $forgeVersion = explode(':', Input::get('forgeVersion'));
+        $build->forgeVersion = $forgeVersion[0];
+        
 		$build->save();
 		Cache::forget('modpack.' . $modpack->slug);
 		if (!empty($clone))
