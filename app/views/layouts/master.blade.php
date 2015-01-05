@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8">
-    <title>TechnicSolder v{{ SOLDER_VERSION }}</title>
+    <title>TechnicSolder {{ SOLDER_VERSION }}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     {{ HTML::script('js/jquery-1.11.1.min.js') }}
     {{ HTML::script('js/bootstrap.min.js') }}
@@ -15,8 +15,8 @@
     {{ HTML::script('js/plugins/dataTables/dataTables.bootstrap.js') }}
     {{ HTML::style('css/dataTables.bootstrap.css') }}
     {{ HTML::script('js/jquery.slugify.js') }}
+    {{ HTML::style('css/OpenSansfont.css') }}
     @yield('top')
-    <link href='http://fonts.googleapis.com/css?family=Open+Sans:400,600,700' rel='stylesheet' type='text/css'>
   </head>
   <body>
     <nav class="navbar navbar-default navbar-static-top" role="navigation" style="margin-bottom: 0">
@@ -27,11 +27,19 @@
                 <span class="icon-bar"></span>
                 <span class="icon-bar"></span>
             </button>
-            <a class="navbar-brand" href="{{ URL::to('dashboard') }}">TechnicSolder v{{ SOLDER_VERSION }}</a>
+            <a class="navbar-brand" href="{{ URL::to('dashboard') }}">TechnicSolder {{ SOLDER_VERSION }}</a>
         </div>
-        <!-- /.navbar-header -->
-
+        <ul class="nav navbar-top-links navbar-left">
+          @if (Session::has('update'))
+          <li>
+              <a href="{{ URL::to('solder/update') }}" style="color:orangered;">
+                 Update Available! <i class="fa fa-exclamation-triangle"></i>
+              </a>
+          </li>
+          @endif
+        </ul>
         <ul class="nav navbar-top-links navbar-right">
+            <li><a href="https://github.com/TechnicPack/TechnicSolder/wiki" target="blank_">Help <i class="fa fa-question"></i></a></li>
             <li class="dropdown">
                 <a class="dropdown-toggle" data-toggle="dropdown" href="#">
                   {{ Auth::user()->username }} <i class="fa fa-user fa-fw"></i>  <i class="fa fa-caret-down"></i>
@@ -91,6 +99,9 @@
                   <ul class="nav nav-second-level">
                       <li>
                           <a href="{{ URL::to('solder/configure') }}">Main Settings</a>
+                      </li>
+                      <li>
+                          <a href="{{ URL::to('solder/update') }}">Update Checker</a>
                       </li>
                       <li>
                           <a href="{{ URL::to('user/list') }}">User Management</a>

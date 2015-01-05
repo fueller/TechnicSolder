@@ -21,6 +21,46 @@ class SolderController extends BaseController {
 		return View::make('solder.configure');
 	}
 
+	public function getUpdate()
+	{
+
+		$version = UpdateUtils::getCurrentVersion();
+		$commit = UpdateUtils::getCurrentCommit();
+		$changelog = array_slice(UpdateUtils::getChangelog('latest'), 0, 10);
+
+		$latestVersion = UpdateUtils::getLatestVersion()['name'];
+
+		$currentData = array('version' => $version,
+							 'commit' => $commit);
+
+		$latestData = array('version' => $latestVersion,
+							'commit' => $changelog[0]);
+
+		return View::make('solder.update')->with('changelog', $changelog)->with('currentData', $currentData)->with('latestData', $latestData);
+	}
+
+	public function getUpdateCheck()
+	{
+		if (Request::ajax())
+		{
+			if(UpdateUtils::getUpdateCheck(true)){
+				Session::put('update', true);
+				return Response::json(array(
+									'status' => 'success',
+									'update' => true
+									));
+			} else {
+				Session::forget('update');
+				return Response::json(array(
+									'status' => 'success',
+									'update' => false
+									));
+			}
+		}
+
+		return App::abort(404);
+	}
+
 	public function getCacheMinecraft() {
 		if (Request::ajax())
 		{
@@ -50,5 +90,4 @@ class SolderController extends BaseController {
 
 		return App::abort(404);
 	}
-
 }
