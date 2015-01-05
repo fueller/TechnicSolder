@@ -29,6 +29,10 @@
                     <label for="slug">Modpack Slug</label>
                     <input type="text" class="form-control" name="slug" id="slug" value="{{ $modpack->slug }}">
                 </div>
+                <div class="form-group">
+                    <label for="description">Modpack Description</label>
+                    <textarea class="form-control" cols="47" rows="5" style="width: 390px" name="description" id="description" placeholder="Description of the ModPack">{{ $modpack->description }}</textarea>
+                </div>
                 <hr>
                 <p class="alert alert-warning"><strong>WARNING:</strong> Hidden and/or Private packs will not show up on the Platform when attempting to import. Set them to Hidden or Private AFTER importing</p>
 				<div class="form-group">

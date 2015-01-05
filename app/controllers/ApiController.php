@@ -199,6 +199,7 @@ class APIController extends BaseController {
 		$response['name']           = $modpack->slug;
 		$response['display_name']	= $modpack->name;
 		$response['url']            = $modpack->url;
+        $response['description']    = $modpack->description;
 
 		$resourcePath = URL::asset('resources/' . $modpack->slug);
 

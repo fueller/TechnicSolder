@@ -27,6 +27,10 @@
 		            <label for="slug">Modpack Slug</label>
 		            <input type="text" class="form-control" name="slug" id="slug">
 		        </div>
+                <div class="form-group">
+                    <label for="description">Modpack Description</label>
+                    <textarea class="form-control" cols="47" rows="5" style="width: 390px" name="description" id="description" placeholder="Description of the ModPack"></textarea>
+                </div>
 		    </div>
 		   	<div class="col-md-6">
 		   		<p>Creating a modpack is simple. Fill in the information here and make sure you have the corresponding folder created on your repository with the necessary files. </p>

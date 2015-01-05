@@ -174,6 +174,7 @@ class ModpackController extends BaseController {
 		$modpack = new Modpack();
 		$modpack->name = Input::get('name');
 		$modpack->slug = Str::slug(Input::get('slug'));
+        $modpack->description = Input::get('description');
 		$modpack->save();
 
 		/* Gives creator modpack perms */
@@ -251,6 +252,7 @@ class ModpackController extends BaseController {
 		$modpack->name = Input::get('name');
 		$oldSlug = $modpack->slug;
 		$modpack->slug = Input::get('slug');
+		$modpack->description = Input::get('description');
 		$modpack->icon_md5 = UrlUtils::get_remote_md5($url.'icon.png');
 		$modpack->logo_md5 = UrlUtils::get_remote_md5($url.'logo_180.png');
 		$modpack->background_md5 = UrlUtils::get_remote_md5($url.'background.jpg');

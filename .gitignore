@@ -9,4 +9,5 @@ bootstrap/compiled.php
 public/forge.txt
 public/mods/
 public/natives/
+public/install_profile/
 app/database/*.sqlite
