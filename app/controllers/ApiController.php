@@ -116,9 +116,61 @@ class APIController extends BaseController {
 		else
 			return Response::json(array("valid" => "Key validated.", "name" => $key->name, "created_at" => $key->created_at));
 	}
+    
+    public function getModlist()
+    {
+        return Response::json($this->fetchMods());
+    }
 
 
 	/* Private Functions */
+    
+    private function fetchMods()
+    {
+        if (Cache::has('mods') && empty($this->client))
+        {
+            $mods = Cache::get('mods');
+        } else {
+            $mods = Mod::where('id', '>', '0')->orderBy('id')->get();
+            if ( empty($this->client)){
+                Cache::put('mods', $mods, 5);
+            }
+        }
+        
+        if (Cache::has('modVersions') && empty($this->client))
+        {
+            $versions = Cache::get('modVersions');
+        } else {
+            $versions = Modversion::where('id', '>', '0')->orderBy('id')->get();
+            if ( empty($this->client)){
+                Cache::put('modVersions', $versions, 5);
+            }
+        }
+        
+        $response = array();
+		$response['mods'] = array();
+        foreach ($mods as $mod)
+        {
+            $response['mods'][$mod->name] = array();
+            $response['mods'][$mod->name]['id'] = $mod->id;
+            $response['mods'][$mod->name]['name'] = $mod->name;
+            $response['mods'][$mod->name]['description'] = $mod->description;
+            $response['mods'][$mod->name]['author'] = $mod->author;
+            $response['mods'][$mod->name]['link'] = $mod->link;
+            $response['mods'][$mod->name]['pretty_name'] = $mod->pretty_name;
+            $response['mods'][$mod->name]['versions'] = array();
+            foreach ($versions as $version)
+            {
+                if ($mod->id == $version->mod_id){
+                    $response['mods'][$mod->name]['versions'][$version->version] = array();
+                    $response['mods'][$mod->name]['versions'][$version->version]['version'] = $version->version;
+                    $response['mods'][$mod->name]['versions'][$version->version]['md5'] = $version->md5;
+                }
+            }
+        }
+        
+        return $response;
+    }
 
 	private function fetchMod($mod)
 	{
