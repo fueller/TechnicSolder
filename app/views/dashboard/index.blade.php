@@ -14,7 +14,7 @@
 		<div class="panel-heading" role="tab" id="recentModpacksHeading">
 		<h3 class="panel-title">
 			<a data-toggle="collapse" data-parent="#accordion" href="#recentModpacks" aria-expanded="true" aria-controls="recentModpacks">
-				Recently Updated Modpacks
+				<i class="fa fa-refresh"></i> Recently Updated Modpacks
 			</a>
 		</h3>
 		</div>
@@ -53,7 +53,7 @@
 		<div class="panel-heading" role="tab" id="recentModVersionsHeading">
 		<h3 class="panel-title">
 			<a data-toggle="collapse" data-parent="#accordion" href="#recentModVersions" aria-expanded="true" aria-controls="recentModVersions">
-				Recently Added Mod Versions
+				<i class="fa fa-refresh"></i> Recently Added Mod Versions
 			</a>
 		</h3>
 		</div>
@@ -96,17 +96,26 @@
 		<div class="panel-heading" role="tab" id="changelogHeading">
 		<h3 class="panel-title">
 			<a data-toggle="collapse" data-parent="#accordion" href="#changelog" aria-expanded="true" aria-controls="changelog">
-				Changelog
+				<i class="fa fa-list"></i> Changelog
 			</a>
 		</h3>
 		</div>
 		<div id="changelog" class="panel-collapse collapse in" role="tabpanel" aria-labelledby="changelogHeading">
 			<div class="panel-body">
+				@if (!Cache::get('checker'))
+				<div class="alert alert-danger">Update Checker is disabled. Latest Changelog from Github is displayed instead.</div>
+				@endif
 				<p><strong>{{SOLDER_VERSION}}</strong></p>
 				<ul>
-		  		@foreach ($changelog as $change)
-		  		<li>{{ HTML::link('https://github.com/TechnicPack/TechnicSolder/commit/'.$change['hash'], $change['abr_hash']) }} <span style="margin-left:5px;margin-right:5px;"><i class="fa fa-angle-double-left fa-1"></i></span> {{ $change['message'] }} </li>
-		  		@endforeach
+				@if (Cache::get('checker'))
+				@foreach ($changelog as $change)
+				<li>{{ HTML::link('https://github.com/TechnicPack/TechnicSolder/commit/'.$change['hash'], $change['abr_hash']) }} <span style="margin-left:5px;margin-right:5px;"><i class="fa fa-angle-double-left fa-1"></i></span> {{ $change['message'] }} </li>
+				@endforeach
+				@else
+				@foreach ($changelog as $change)
+				<li>{{ HTML::link($change['commit']['url'], substr($change['sha'], 0, 7)) }} <span style="margin-left:5px;margin-right:5px;"><i class="fa fa-angle-double-left fa-1"></i></span> {{ $change['commit']['message'] }} </li>
+				@endforeach
+				@endif
 				</ul>
 			</div>
 		</div>

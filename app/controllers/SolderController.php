@@ -23,19 +23,33 @@ class SolderController extends BaseController {
 
 	public function getUpdate()
 	{
-
-		$version = UpdateUtils::getCurrentVersion();
-		$commit = UpdateUtils::getCurrentCommit();
 		$changelog = array_slice(UpdateUtils::getChangelog('latest'), 0, 10);
 
 		$latestVersion = UpdateUtils::getLatestVersion()['name'];
 
-		$currentData = array('version' => $version,
-							 'commit' => $commit);
-
 		$latestData = array('version' => $latestVersion,
 							'commit' => $changelog[0]);
 
+		if (Cache::has('checker') && Cache::get('checker')) {
+			$version = UpdateUtils::getCurrentVersion();
+			$commit = UpdateUtils::getCurrentCommit();
+			$branch = UpdateUtils::getCurrentBranch();
+
+			$currentData = array('version' => $version,
+							 'commit' => $commit,
+							 'branch' => $branch,
+							 'shell_exec' => UpdateUtils::isExecEnabled(),
+							 'git' => UpdateUtils::isGitInstalled(),
+							 'gitrepo' => UpdateUtils::isGitRepo());
+
+			return View::make('solder.update')->with('changelog', $changelog)->with('currentData', $currentData)->with('latestData', $latestData);
+		}
+
+		$currentData = array('version' => SOLDER_VERSION,
+							 'shell_exec' => UpdateUtils::isExecEnabled(),
+							 'git' => UpdateUtils::isGitInstalled(),
+							 'gitrepo' => UpdateUtils::isGitRepo());
+		
 		return View::make('solder.update')->with('changelog', $changelog)->with('currentData', $currentData)->with('latestData', $latestData);
 	}
 
@@ -43,16 +57,28 @@ class SolderController extends BaseController {
 	{
 		if (Request::ajax())
 		{
+			$branch = UpdateUtils::getCurrentBranch();
+
 			if(UpdateUtils::getUpdateCheck(true)){
-				Session::put('update', true);
+				Cache::put('update', true, 60);
 				return Response::json(array(
 									'status' => 'success',
+									'build' => false,
+									'branch' => $branch,
 									'update' => true
 									));
 			} else {
-				Session::forget('update');
+				Cache::forget('update');
+
+				$changelog = array_slice(UpdateUtils::getChangelog('latest'), 0, 10)[0];
+				$commit = UpdateUtils::getCurrentCommit();
+				$build = boolval(strcasecmp($commit, $changelog['sha']) != 0);
+				
+
 				return Response::json(array(
 									'status' => 'success',
+									'build' => $build,
+									'branch' => $branch,
 									'update' => false
 									));
 			}
@@ -66,12 +92,12 @@ class SolderController extends BaseController {
 		{
 			$reason = '';
 			try {
-				$reason = MinecraftUtils::getMinecraftVersions();
+				$reason = MinecraftUtils::getMinecraft(true);
 			}
 			catch (Exception $e) {
 				return Response::json(array(
 									'status' => 'error',
-									'reason' => $e
+									'reason' => $e->getMessage()
 									));
 			}
 

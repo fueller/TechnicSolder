@@ -13,7 +13,9 @@
 
 App::before(function($request)
 {
-	//
+	if(!Cache::has('checker')){
+		Cache::forever('checker', UpdateUtils::getCheckerEnabled());
+	}
 });
 
 
@@ -22,10 +24,10 @@ App::after(function($request, $response)
 	//
 });
 
-/*App::missing(function($exception)
+App::missing(function($exception)
 {
-	return Response::make('Missing', 404);
-});*/
+	return Response::view('errors.missing', array(), 404);
+});
 
 /*
 |--------------------------------------------------------------------------

@@ -12,19 +12,33 @@
 		    Solder Versioning
 		    </div>
 		    <div class="panel-body">
+                @if (!Cache::get('checker'))
+                <div class="alert alert-danger">Update Checker is disabled. Latest info from Github is displayed instead.</div>
+                @endif
 		        <label>Current Version: <span class="label label-default">{{ $currentData['version'] }}</span></label><br>
+                @if (Cache::get('checker'))
 		        <label>Current Commit: <span class="label label-default">{{ $currentData['commit'] }}</span></label><br>
-		        <label>Latest Version: <span class="label label-default">{{ $currentData['version'] }}</span></label><br>
-		        <label>Latest Commit: <span class="label label-default">{{ $currentData['commit'] }}</span></label>
+                <label>Current Branch: <span class="label label-default">{{ $currentData['branch'] }}</span></label><br>
+                @endif
+		        <label>Latest Version: <span class="label label-default">{{ $latestData['version'] }}</span></label><br>
+		        <label>Latest Commit: <span class="label label-default">{{ $latestData['commit']['sha'] }}</span></label><br>
+                <label>Shell Access: {{ $currentData['shell_exec'] ? "<span class='label label-success'> Yes" : "<span class='label label-danger'> No" }}</span></label><br>
+                <label>Git Installed: {{ $currentData['git'] ? "<span class='label label-success'> Yes" : "<span class='label label-danger'> No" }}</span></label><br>
+                <label>Git Repository Found: {{ $currentData['gitrepo'] ? "<span class='label label-success'> Yes" : "<span class='label label-danger'> No" }}</span></label><br>
 			</div>
 		</div>
+        @if (Cache::get('checker'))
         <div class="panel panel-default">
             <div class="panel-heading">
             Update Check
             </div>
             <div class="panel-body">
-                @if (Session::has('update'))
-                <p id='solder-update-ajax' class="alert alert-warning">Solder is out of date. Please refer to the wiki on how to update.</p>                
+                @if (Cache::has('update') && Cache::get('update'))
+                <p id='solder-update-ajax' class="alert alert-danger">Solder is out of date. Please refer to the wiki on how to update.</p>                
+                @elseif (Cache::get('checker') && strcasecmp($currentData['commit'], $latestData['commit']['sha']) != 0 && $currentData['branch'] == 'master')
+                <p id='solder-update-ajax' class="alert alert-warning">Solder is up to date, but hotfixes are available</p>
+                @elseif (Cache::get('checker') && strcasecmp($currentData['commit'], $latestData['commit']['sha']) != 0 && $currentData['branch'] == 'dev')
+                <p id='solder-update-ajax' class="alert alert-warning">Solder is up to date, but dev builds are available</p>
                 @else
                 <p id='solder-update-ajax' class="alert alert-success">Solder is up to date</p>
                 @endif
@@ -33,6 +47,7 @@
                 <span id="solder-checking" style="margin-left:10px;" class="hidden"><i class="fa fa-cog fa-spin"></i> Checking...</span>
             </div>
         </div>
+        @endif
 	</div>
 	<div class="col-lg-6">
         <div class="panel panel-default">
@@ -69,9 +84,17 @@ $('#solder-update').click(function(e) {
         success: function (data) {
             if (data.status == "success") {
                 if(data.update) {
-                    $("#solder-update-ajax").removeClass("alert-warning alert-success alert-danger").addClass("alert-warning").html('Solder is out of date. Please refer to the wiki on how to update.').fadeIn();
+                    $("#solder-update-ajax").removeClass("alert-warning alert-success alert-danger").addClass("alert-danger").html('Solder is out of date. Please refer to the wiki on how to update.').fadeIn();
                 } else {
-                    $("#solder-update-ajax").removeClass("alert-warning alert-success alert-danger").addClass("alert-success").html('Solder is up to date.').fadeIn();
+                    if(data.build) {
+                        if(data.branch == 'dev'){
+                            $("#solder-update-ajax").removeClass("alert-warning alert-success alert-danger").addClass("alert-warning").html('Solder is up to date, but dev builds are available').fadeIn();
+                        } else {
+                            $("#solder-update-ajax").removeClass("alert-warning alert-success alert-danger").addClass("alert-warning").html('Solder is up to date, but hotfixes are available').fadeIn();
+                        }
+                    } else {
+                        $("#solder-update-ajax").removeClass("alert-warning alert-success alert-danger").addClass("alert-success").html('Solder is up to date.').fadeIn();
+                    }
                 }
             } else {
                 $("#solder-update-ajax").removeClass("alert-warning alert-success alert-danger").addClass("alert-danger").html('Error checking for update. ' + data.reason);

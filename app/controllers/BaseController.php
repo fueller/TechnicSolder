@@ -5,7 +5,11 @@ class BaseController extends Controller {
 	public function __construct()
 	{
 		define('SOLDER_STREAM', 'DEV');
-		define('SOLDER_VERSION', UpdateUtils::getCurrentVersion());
+		if(UpdateUtils::getCheckerEnabled()){
+			define('SOLDER_VERSION', UpdateUtils::getCurrentVersion());
+		} else {
+			define('SOLDER_VERSION', 'v0.7.0.9');
+		}
 
 	}
 
@@ -31,26 +35,20 @@ class BaseController extends Controller {
 			Auth::user()->save();
 
 			//Check for update on login
-			if(UpdateUtils::getUpdateCheck()){
-				Session::put('update', true);
+			if(!Cache::has('checker')){
+				Cache::forever('checker', UpdateUtils::getCheckerEnabled());
+			} else {
+				if(Cache::get('checker')){
+					if(UpdateUtils::getUpdateCheck(true)){
+						Cache::put('update', true, 60);
+					}
+				}
 			}
 
 			return Redirect::to('dashboard/');
 		} else {
 			return Redirect::to('login')->with('login_failed',"Invalid Username/Password");
 		}
-	}
-
-	/**
-	 * Catch-all method for requests that can't be matched.
-	 *
-	 * @param  string    $method
-	 * @param  array     $parameters
-	 * @return Response
-	 */
-	public function __call($method, $parameters)
-	{
-		return App::abort('404');
 	}
 
 }
