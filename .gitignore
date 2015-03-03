@@ -14,3 +14,4 @@ public/install_profile/
 app/database/*.sqlite
 site/
 bootstrap/compiled.php
+*.orig
