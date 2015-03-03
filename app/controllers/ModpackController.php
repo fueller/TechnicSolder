@@ -1,11 +1,12 @@
 <?php
 
+use Aws\S3\S3Client;
+use Illuminate\Support\MessageBag;
 class ModpackController extends BaseController {
 
 	public function __construct()
 	{
 		parent::__construct();
-		$this->beforeFilter('auth');
 		$this->beforeFilter('solder_modpacks');
 		$this->beforeFilter('modpack', array('only' => array('getView', 'getDelete', 'postDelete', 'getEdit', 'postEdit', 'getAddBuild', 'postAddBuild')));
 		$this->beforeFilter('build', array('only' => array('anyBuild')));
@@ -24,24 +25,18 @@ class ModpackController extends BaseController {
 
 	public function getView($modpack_id = null)
 	{
-		if (empty($modpack_id))
-			return Redirect::to('modpack');
-
 		$modpack = Modpack::find($modpack_id);
 		if (empty($modpack))
-			return Redirect::to('modpack');
+			return Redirect::to('modpack/list')->withErrors(new MessageBag(array('Modpack not found')));
 
 		return View::make('modpack.view')->with('modpack', $modpack);
 	}
 
 	public function anyBuild($build_id = null)
 	{
-		if (empty($build_id))
-			return Redirect::to('modpack');
-
 		$build = Build::find($build_id);
 		if (empty($build))
-			return Redirect::to('modpack');
+			return Redirect::to('modpack/list')->withErrors(new MessageBag(array('Modpack not found')));
 
 		if (Input::get('action') == "delete")
 		{
@@ -81,12 +76,9 @@ class ModpackController extends BaseController {
 
 	public function getAddBuild($modpack_id)
 	{
-		if (empty($modpack_id))
-			return Redirect::to('modpack');
-
 		$modpack = Modpack::find($modpack_id);
 		if (empty($modpack))
-			return Redirect::to('modpack');
+			return Redirect::to('modpack/list')->withErrors(new MessageBag(array('Modpack not found')));
 
 		$minecraft = MinecraftUtils::getMinecraft();
         $forgeVersion = MinecraftUtils::getForge();
@@ -101,12 +93,9 @@ class ModpackController extends BaseController {
 
 	public function postAddBuild($modpack_id)
 	{
-		if (empty($modpack_id))
-			return Redirect::to('modpack');
-
 		$modpack = Modpack::find($modpack_id);
 		if (empty($modpack))
-			return Redirect::to('modpack');
+			return Redirect::to('modpack/list')->withErrors(new MessageBag(array('Modpack not found')));
 
 		$rules = array(
 			"version" => "required",
@@ -169,12 +158,18 @@ class ModpackController extends BaseController {
 		$validation = Validator::make(Input::all(), $rules, $messages);
 
 		if ($validation->fails())
-			return Redirect::back()->withErrors($validation->messages());
+			return Redirect::to('modpack/create')->withErrors($validation->messages());
 
 		$modpack = new Modpack();
 		$modpack->name = Input::get('name');
 		$modpack->slug = Str::slug(Input::get('slug'));
+		$modpack->icon_md5 = md5_file(public_path() . '/resources/default/icon.png');
         $modpack->description = Input::get('description');
+		$modpack->icon_url = URL::asset('/resources/default/icon.png');
+		$modpack->logo_md5 = md5_file(public_path() . '/resources/default/logo.png');
+		$modpack->logo_url = URL::asset('/resources/default/logo.png');
+		$modpack->background_md5 = md5_file(public_path() . '/resources/default/background.jpg');
+		$modpack->background_url = URL::asset('/resources/default/background.jpg');
 		$modpack->save();
 
 		/* Gives creator modpack perms */
@@ -192,6 +187,24 @@ class ModpackController extends BaseController {
 		}
 		$perm->save();
 
+		try {
+			$useS3 = Config::get('solder.use_s3');
+
+			if ($useS3) {
+				$resourcePath = storage_path() . '/resources/' . $modpack->slug;
+			} else {
+				$resourcePath = public_path() . '/resources/' . $modpack->slug;
+			}
+
+			/* Create new resources directory for modpack */
+			if (!file_exists($resourcePath)) {
+				mkdir($resourcePath, 0775, true);
+			}
+		} catch(Exception $e) {
+			Log::error($e);
+			return Redirect::to('modpack/create')->withErrors($e->getMessage());
+		}
+
 		return Redirect::to('modpack/view/'.$modpack->id);
 	}
 
@@ -202,15 +215,10 @@ class ModpackController extends BaseController {
 	 */
 	public function getEdit($modpack_id)
 	{
-		if (empty($modpack_id))
-		{
-			return Redirect::to('dashboard');
-		}
-
 		$modpack = Modpack::find($modpack_id);
-		if (empty($modpack_id))
+		if (empty($modpack))
 		{
-			return Redirect::to('dashboard');
+			return Redirect::to('dashboard')->withErrors(new MessageBag(array('Modpack not found')));
 		}
 
 		$clients = array();
@@ -225,15 +233,10 @@ class ModpackController extends BaseController {
 
 	public function postEdit($modpack_id)
 	{
-		if (empty($modpack_id))
-		{
-			return Redirect::to('dashboard');
-		}
-
 		$modpack = Modpack::find($modpack_id);
-		if (empty($modpack_id))
+		if (empty($modpack))
 		{
-			return Redirect::to('dashboard');
+			return Redirect::to('modpack/list/')->withErrors(new MessageBag(array('Modpack not found')));
 		}
 
 		$rules = array(
@@ -250,121 +253,247 @@ class ModpackController extends BaseController {
 		if ($validation->fails())
 			return Redirect::back()->withErrors($validation->messages());
 
-		$url = Config::get('solder.repo_location').Input::get('slug').'/resources/';
 		$modpack->name = Input::get('name');
 		$oldSlug = $modpack->slug;
 		$modpack->slug = Input::get('slug');
 		$modpack->description = Input::get('description');
-		$modpack->icon_md5 = UrlUtils::get_remote_md5($url.'icon.png');
-		$modpack->logo_md5 = UrlUtils::get_remote_md5($url.'logo_180.png');
-		$modpack->background_md5 = UrlUtils::get_remote_md5($url.'background.jpg');
 		$modpack->hidden = Input::get('hidden') ? true : false;
 		$modpack->private = Input::get('private') ? true : false;
 		$modpack->save();
 
-		$useS3 = Config::get('solder.use_s3');
+		$useS3 = Config::get('solder.use_s3') ? true : false;
+		$S3bucket = Config::get('solder.bucket');
+		$newSlug = (bool) $oldSlug != $modpack->slug;
 
 		if ($useS3) {
 			$resourcePath = storage_path() . '/resources/' . $modpack->slug;
-		} else {
-			$resourcePath = public_path() . '/resources/' . $modpack->slug;
+			$oldPath = storage_path() . '/resources/' . $oldSlug;
+			$client = S3Client::factory(array(
+                        'key' => Config::get('solder.access_key'),
+                        'secret' => Config::get('solder.secret_key')
+                    ));
+			if(!$client->doesBucketExist($S3bucket)) {
+				Log::error('Amazon S3 error, Bucket '. $S3bucket . ' does not exist.');
+				$useS3 = false;
+			}
 		}
 
+		if (!$useS3){
+			$resourcePath = public_path() . '/resources/' . $modpack->slug;
+			$oldPath = public_path() . '/resources/' . $oldSlug;
+		}
 
 		/* Create new resources directory for modpack */
 		if (!file_exists($resourcePath)) {
 			mkdir($resourcePath, 0775, true);
 		}
 
-		/* If slug changed, move resources and delete old slug directory */
-		if ($oldSlug != $modpack->slug) {
+		/* Image dohickery */
+		if ($icon = Input::file('icon')) {
+			if ($icon->isValid()) {
+				$iconimg = Image::make(Input::file('icon')->getRealPath())->resize(50,50)->encode('png', 100);
 
-			$oldPath = public_path() . '/resources/' . $oldSlug;
+				if ($success = $iconimg->save($resourcePath . '/icon.png', 100)) {
+					$modpack->icon = true;
 
-			if ($useS3) {
+					if ($useS3) {
+						$result = $client->putObject(array(
+									'Bucket' => $S3bucket,
+									'Key' => '/resources/'.$modpack->slug.'/icon.png',
+									'Body' => $iconimg,
+									'ACL' => 'public-read',
+									'ContentType' => 'image/png'
+								));
 
-				S3::copyObject(Config::get('solder.bucket'), 'resources/'.$oldSlug.'/logo.png', Config::get('solder.bucket'), 'resources/'.$modpack->slug.'/logo.png', S3::ACL_PUBLIC_READ);
-				S3::copyObject(Config::get('solder.bucket'), 'resources/'.$oldSlug.'/background.png', Config::get('solder.bucket'), 'resources/'.$modpack->slug.'/background.png', S3::ACL_PUBLIC_READ);
-				S3::copyObject(Config::get('solder.bucket'), 'resources/'.$oldSlug.'/icon.png', Config::get('solder.bucket'), 'resources/'.$modpack->slug.'/icon.png', S3::ACL_PUBLIC_READ);
-				S3::deleteObject(Config::get('solder.bucket'), 'resources/'.$oldSlug.'/logo.png');
-				S3::deleteObject(Config::get('solder.bucket'), 'resources/'.$oldSlug.'/background.png');
-				S3::deleteObject(Config::get('solder.bucket'), 'resources/'.$oldSlug.'/icon.png');
+						$modpack->icon_url = $result['ObjectURL'];
+						$modpack->icon_md5 = $result['ETag'];
+					} else {
+						$modpack->icon_url = URL::asset('/resources/' . $modpack->slug . '/icon.png');
+						$modpack->icon_md5 = md5_file($resourcePath . "/icon.png");
+					}
 
-				$oldPath = storage_path() . '/resources/' . $oldSlug;
+					if($newSlug) {
+						if ($useS3) {
+							$client->deleteObject(array(
+								'Bucket' => $S3bucket,
+								'Key' => '/resources/'.$modpack->slug.'/icon.png'
+							));
+						}
+
+						if (file_exists($oldPath . "/icon.png")) {
+							unlink($oldPath . "/icon.png");
+						}
+					}
+				} else if (!$success && !$modpack->icon) {
+					$modpack->icon_md5 = md5_file(public_path() . '/resources/default/icon.png');
+					$modpack->icon_url = URL::asset('/resources/default/icon.png');
+					return Redirect::back()->withErrors(new MessageBag(array('Failed to save new image to ' . $resourcePath . '/icon.png')));
+				} else {
+					Log::error('Failed to save new image to ' . $resourcePath . '/icon.png');
+					return Redirect::back()->withErrors(new MessageBag(array('Failed to save new image to ' . $resourcePath . '/icon.png')));
+				}
 			}
+		} else {
+			if($newSlug) {
+				if ($useS3) {
+					$client->copyObject(array(
+						'Bucket' => $S3bucket,
+						'Key' => '/resources/'.$modpack->slug.'/icon.png',
+						'CopySource' => '/resources/'.$oldSlug.'/icon.png',
+						'ACL' => 'public-read',
+						'ContentType' => 'image/png'
+					));
+					$client->deleteObject(array(
+						'Bucket' => $S3bucket,
+						'Key' => '/resources/'.$modpack->slug.'/icon.png'
+					));
+				}
 
-			if (file_exists($oldPath . "/logo.png")) {
-				copy($oldPath . "/logo.png", $resourcePath . "/logo.png");
-				unlink($oldPath . "/logo.png");
-			}
-
-			if (file_exists($oldPath . "/background.png")) {
-				copy($oldPath . "/background.png", $resourcePath . "/background.png");
-				unlink($oldPath . "/background.png");
-			}
-
-			if (file_exists($oldPath . "/icon.png")) {
-				copy($oldPath . "/icon.png", $resourcePath . "/icon.png");
-				unlink($oldPath . "/icon.png");
-			}
-
-			if (file_exists($oldPath)) {
-				rmdir($oldPath);
+				if (file_exists($oldPath . "/icon.png")) {
+					copy($oldPath . "/icon.png", $resourcePath . "/icon.png");
+					unlink($oldPath . "/icon.png");
+				}
 			}
 		}
 
-		/* Image dohickery */
 		if ($logo = Input::file('logo')) {
 			if ($logo->isValid()) {
-				$success = Image::make(Input::file('logo'))
-			        ->resize(370, 220)->save($resourcePath . '/logo.png', 100);
+				$logoimg = Image::make(Input::file('logo')->getRealPath())->resize(370,220)->encode('png', 100);
 
-			    /*
-			    if ($useS3) {
-			    	S3::putObject(S3::inputFile($resourcePath . '/logo.' . $extension, false), Config::get('solder.bucket'), 'resources/'.$modpack->slug.'/logo.png', S3::ACL_PUBLIC_READ);
-			    }
-			    */
+				if ($success = $logoimg->save($resourcePath . '/logo.png', 100)) {
+					$modpack->logo = true;
+					
+					if ($useS3) {
+						$result = $client->putObject(array(
+									'Bucket' => $S3bucket,
+									'Key' => '/resources/'.$modpack->slug.'/logo.png',
+									'Body' => $logoimg,
+									'ACL' => 'public-read',
+									'ContentType' => 'image/png'
+								));
 
-			    if ($success) {
-			        $modpack->logo = true;
-			        $modpack->logo_md5 = md5_file($resourcePath . "/logo.png");
-			    }
+						$modpack->logo_url = $result['ObjectURL'];
+						$modpack->logo_md5 = $result['ETag'];
+					} else {
+						$modpack->logo_url = URL::asset('/resources/' . $modpack->slug . '/logo.png');
+						$modpack->logo_md5 = md5_file($resourcePath . "/logo.png");
+					}
+
+					if($newSlug) {
+						if ($useS3) {
+							$client->deleteObject(array(
+								'Bucket' => $S3bucket,
+								'Key' => '/resources/'.$modpack->slug.'/logo.png'
+							));
+						}
+
+						if (file_exists($oldPath . "/logo.png")) {
+							unlink($oldPath . "/logo.png");
+						}
+					}
+				} else if (!$success && !$modpack->logo) {
+					$modpack->logo_md5 = md5_file(public_path() . '/resources/default/logo.png');
+					$modpack->logo_url = URL::asset('/resources/default/logo.png');
+					return Redirect::back()->withErrors(new MessageBag(array('Failed to save new image to ' . $resourcePath . '/logo.png')));
+				} else {
+					Log::error('Failed to save new image to ' . $resourcePath . '/logo.png');
+					return Redirect::back()->withErrors(new MessageBag(array('Failed to save new image to ' . $resourcePath . '/logo.png')));
+				}
+			}
+		} else {
+			if($newSlug) {
+				if ($useS3) {
+					$client->copyObject(array(
+						'Bucket' => $S3bucket,
+						'Key' => '/resources/'.$modpack->slug.'/logo.png',
+						'CopySource' => '/resources/'.$oldSlug.'/logo.png',
+						'ACL' => 'public-read',
+						'ContentType' => 'image/png'
+					));
+					$client->deleteObject(array(
+						'Bucket' => $S3bucket,
+						'Key' => '/resources/'.$modpack->slug.'/logo.png'
+					));
+				}
+
+				if (file_exists($oldPath . "/logo.png")) {
+					copy($oldPath . "/logo.png", $resourcePath . "/logo.png");
+					unlink($oldPath . "/logo.png");
+				}
 			}
 		}
 
 		if ($background = Input::file('background')) {
 			if ($background->isValid()) {
-				$success = Image::make(Input::file('background'))
-			        ->resize(900, 600)->save($resourcePath . '/background.png', 100);
+				$backgroundimg = Image::make(Input::file('background')->getRealPath())->resize(900,600)->encode('jpg', 100);
 
-			    /*
-			    if ($useS3) {
-			    	S3::putObject(S3::inputFile($resourcePath . '/background.' . $extension, false), Config::get('solder.bucket'), 'resources/'.$modpack->slug.'/background.png', S3::ACL_PUBLIC_READ);
-			    }
-			    */
+				if ($success = $backgroundimg->save($resourcePath . '/background.jpg', 100)) {
+					$modpack->background = true;
+					
+					if ($useS3) {
+						$result = $client->putObject(array(
+									'Bucket' => $S3bucket,
+									'Key' => '/resources/'.$modpack->slug.'/background.jpg',
+									'Body' => $backgroundimg,
+									'ACL' => 'public-read',
+									'ContentType' => 'image/jpg'
+								));
 
-			    if ($success) {
-			        $modpack->background = true;
-			        $modpack->background_md5 = md5_file($resourcePath . "/background.png");
-			    }
+						$modpack->background_url = $result['ObjectURL'];
+						$modpack->background_md5 = $result['ETag'];
+					} else {
+						$modpack->background_url = URL::asset('/resources/' . $modpack->slug . '/background.jpg');
+						$modpack->background_md5 = md5_file($resourcePath . "/background.jpg");
+					}
+
+					if($newSlug) {
+						if ($useS3) {
+							$client->deleteObject(array(
+								'Bucket' => $S3bucket,
+								'Key' => '/resources/'.$modpack->slug.'/background.jpg'
+							));
+						}
+
+						if (file_exists($oldPath . "/background.jpg")) {
+							unlink($oldPath . "/background.jpg");
+						}
+					}
+				} else if (!$success && !$modpack->background) {
+					$modpack->background_md5 = md5_file(public_path() . '/resources/default/background.jpg');
+					$modpack->background_url = URL::asset('/resources/default/background.jpg');
+					return Redirect::back()->withErrors(new MessageBag(array('Failed to save new image to ' . $resourcePath . '/background.jpg')));
+				} else {
+					Log::error('Failed to save new image to ' . $resourcePath . '/background.jpg');
+					return Redirect::back()->withErrors(new MessageBag(array('Failed to save new image to ' . $resourcePath . '/background.jpg')));
+				}
+			}
+		} else {
+			if($newSlug) {
+				if ($useS3) {
+					$client->copyObject(array(
+						'Bucket' => $S3bucket,
+						'Key' => '/resources/'.$modpack->slug.'/background.jpg',
+						'CopySource' => '/resources/'.$oldSlug.'/background.jpg',
+						'ACL' => 'public-read',
+						'ContentType' => 'image/jpg'
+					));
+					$client->deleteObject(array(
+						'Bucket' => $S3bucket,
+						'Key' => '/resources/'.$modpack->slug.'/background.jpg'
+					));
+				}
+
+				if (file_exists($oldPath . "/background.jpg")) {
+					copy($oldPath . "/background.jpg", $resourcePath . "/background.jpg");
+					unlink($oldPath . "/background.jpg");
+				}
 			}
 		}
 
-		if ($icon = Input::file('icon')) {
-			if ($icon->isValid()) {
-				$success = Image::make(Input::file('icon'))
-			        ->resize(50, 50)->save($resourcePath . '/icon.png', 100);
-
-				/*
-			    if ($useS3) {
-			    	S3::putObject(S3::inputFile($resourcePath . '/icon.' . $extension, false), Config::get('solder.bucket'), 'resources/'.$modpack->slug.'/icon.png', S3::ACL_PUBLIC_READ);
-			    }
-			    */
-
-			    if ($success) {
-			        $modpack->icon = true;
-			        $modpack->icon_md5 = md5_file($resourcePath . "/icon.png");
-			    }
+		/* If slug changed delete old slug directory */
+		if ($newSlug) {
+			if (file_exists($oldPath)) {
+				rmdir($oldPath);
 			}
 		}
 
@@ -387,15 +516,10 @@ class ModpackController extends BaseController {
 
 	public function getDelete($modpack_id)
 	{
-		if (empty($modpack_id))
-		{
-			return Redirect::to('dashboard');
-		}
-
 		$modpack = Modpack::find($modpack_id);
-		if (empty($modpack_id))
+		if (empty($modpack))
 		{
-			return Redirect::to('dashboard');
+			return Redirect::to('modpack/list/')->withErrors(new MessageBag(array('Modpack not found')));
 		}
 
 		return View::make('modpack.delete')->with(array('modpack' => $modpack));
@@ -403,15 +527,10 @@ class ModpackController extends BaseController {
 
 	public function postDelete($modpack_id)
 	{
-		if (empty($modpack_id))
-		{
-			return Redirect::to('dashboard');
-		}
-
 		$modpack = Modpack::find($modpack_id);
-		if (empty($modpack_id))
+		if (empty($modpack))
 		{
-			return Redirect::to('dashboard');
+			return Redirect::to('modpack/list/')->withErrors(new MessageBag(array('Modpack not found')));
 		}
 
 		foreach ($modpack->builds as $build)
@@ -424,7 +543,7 @@ class ModpackController extends BaseController {
 		$modpack->delete();
 		Cache::forget('modpacks');
 
-		return Redirect::to('modpack/list/')->with('deleted','Modpack Deleted');
+		return Redirect::to('modpack/list/')->with('success','Modpack Deleted');
 	}
 
 

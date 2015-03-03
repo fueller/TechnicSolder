@@ -1,12 +1,17 @@
 <?php
 
+use Illuminate\Support\MessageBag;
 class ClientController extends BaseController {
 
 	public function __construct()
 	{
 		parent::__construct();
-		$this->beforeFilter('auth');
 		$this->beforeFilter('solder_clients');
+	}
+
+	public function getIndex()
+	{
+		return Redirect::to('client/list');
 	}
 
 	public function getList()
@@ -23,23 +28,23 @@ class ClientController extends BaseController {
 	public function postCreate()
 	{
 		$rules = array(
-    		'name' => 'required|unique:clients',
-    		'uuid' => 'required|unique:clients'
-    		);
+			'name' => 'required|unique:clients',
+			'uuid' => 'required|unique:clients'
+			);
 
-    	$validation = Validator::make(Input::all(), $rules);
-    	if ($validation->fails())
-    		return Redirect::back()->withErrors($validation->messages());
+		$validation = Validator::make(Input::all(), $rules);
+		if ($validation->fails())
+			return Redirect::to('client/create')->withErrors($validation->messages());
 
-    	$client = new Client();
-    	$client->name = Input::get('name');
-    	$client->uuid = Input::get('uuid');
-    	$client->save();
+		$client = new Client();
+		$client->name = Input::get('name');
+		$client->uuid = Input::get('uuid');
+		$client->save();
 
-    	/* Immediately clear the cache */
-    	Cache::forget('clients');
+		/* Immediately clear the cache */
+		Cache::forget('clients');
 
-    	return Redirect::to('client/list')->with('success','Client added!');
+		return Redirect::to('client/list')->with('success','Client added!');
 	}
 
 	public function getDelete($client_id)
@@ -47,7 +52,7 @@ class ClientController extends BaseController {
 		$client = Client::find($client_id);
 
 		if (empty($client))
-			return Redirect::back();
+			return Redirect::to('client/list')->withErrors(new MessageBag(array('Client UUID not found')));
 
 		return View::make('client.delete')->with('client', $client);
 	}
@@ -57,7 +62,7 @@ class ClientController extends BaseController {
 		$client = Client::find($client_id);
 
 		if (empty($client))
-			return Redirect::back();
+			return Redirect::to('client/list')->withErrors(new MessageBag(array('Client UUID not found')));
 
 		$client->modpacks()->sync(array());
 		$client->delete();

@@ -6,14 +6,21 @@
 <div class="panel panel-default">
 	<div class="panel-heading">
 	<div class="pull-right">
-	    <a href="{{ URL::to('mod/create') }}" class="btn btn-xs btn-success">Add Mod</a>
+		<a href="{{ URL::to('mod/create') }}" class="btn btn-xs btn-success">Add Mod</a>
 	</div>
 	Mod List
 	</div>
 	<div class="panel-body">
-		@if (Session::has('deleted'))
+		@if (Session::has('success'))
+		<div class="alert alert-success">
+			{{ Session::get('success') }}
+		</div>
+		@endif
+		@if ($errors->all())
 		<div class="alert alert-danger">
-			{{ Session::get('deleted') }}
+		@foreach ($errors->all() as $error)
+			{{ $error }}<br />
+		@endforeach
 		</div>
 		@endif
 		<table class="table table-striped table-bordered table-hover" id="dataTables">
@@ -47,14 +54,14 @@
 @section('bottom')
 <script type="text/javascript">
 $(document).ready(function() {
-    $('#dataTables').dataTable({
+	$('#dataTables').dataTable({
         "order": [[ 1, "asc" ]],
         aLengthMenu: [
             [25, 50, 100, 200, -1],
             [25, 50, 100, 200, "All"]
         ],
         iDisplayLength: -1
-    });
+	});
 
 });
 </script>

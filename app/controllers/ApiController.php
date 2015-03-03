@@ -274,9 +274,10 @@ class APIController extends BaseController {
 		}
 
 		$response['name']           = $modpack->slug;
-		$response['display_name']	= $modpack->name;
+		$response['display_name']   = $modpack->name;
 		$response['url']            = $modpack->url;
         $response['description']    = $modpack->description;
+		$response['icon']           = $modpack->icon_url;
 
 		$resourcePath = URL::asset('resources/' . $modpack->slug);
 
@@ -294,35 +295,9 @@ class APIController extends BaseController {
 		}
 
 		$response['icon_md5']       = $modpack->icon_md5;
-
-		if ($modpack->logo == 0 && !empty($modpack->logo_md5)) {
-			$response['logo'] = Config::get('solder.mirror_url') . $modpack->slug . "/resources/logo.png";
-		} else if ($modpack->logo == 0 && empty($modpack->logo_md5)) {
-			$response['logo'] = URL::asset('resources/default/logo.png');
-			$modpack->logo_md5 = md5_file(public_path() . '/resources/default/logo.png');
-		} else {
-			if (Config::get('solder.use_s3')) {
-				$response['logo'] = Config::get('solder.s3_url').'resources/'.$modpack->slug.'/logo.png?'.TimeUtils::getTimestampDate($modpack->updated_at);
-			} else {
-				$response['logo'] = $resourcePath . "/logo.png";
-			}
-		}
-
+		$response['logo']           = $modpack->logo_url;
 		$response['logo_md5']       = $modpack->logo_md5;
-
-		if ($modpack->background == 0 && !empty($modpack->background_md5)) {
-			$response['background'] = Config::get('solder.mirror_url') . $modpack->slug . "/resources/background.png";
-		} else if ($modpack->background == 0 && empty($modpack->background_md5)) {
-			$response['background'] = URL::asset('resources/default/background.png');
-			$modpack->background_md5 = md5_file(public_path() . '/resources/default/background.png');
-		} else {
-			if (Config::get('solder.use_s3')) {
-				$response['background'] = Config::get('solder.s3_url').'resources/'.$modpack->slug.'/background.png?'.TimeUtils::getTimestampDate($modpack->updated_at);
-			} else {
-				$response['background'] = $resourcePath . "/background.png";
-			}
-		}
-
+		$response['background']     = $modpack->background_url;
 		$response['background_md5'] = $modpack->background_md5;
 		$response['recommended']    = $modpack->recommended;
 		$response['latest']         = $modpack->latest;
@@ -383,48 +358,73 @@ class APIController extends BaseController {
         $response['forgeVersion'] = $build->forgeVersion;
 		$response['mods'] = array();
 
-		foreach ($build->modversions as $modversion)
+		if (!Input::has('include'))
 		{
-			if (!Input::has('include'))
+			if (Cache::has('modpack.'.$slug.'.build.'.$buildpass.'modversion') && empty($this->client) && empty($this->key))
 			{
-				$response['mods'][] = array(
-											"name" => $modversion->mod->name,
-											"version" => $modversion->version,
-											"md5" => $modversion->md5,
-											"url" => Config::get('solder.mirror_url').'mods/'.$modversion->mod->name.'/'.$modversion->mod->name.'-'.$modversion->version.'.zip'
-											);
-			} else if (Input::get('include') == "mods") {
-				$response['mods'][] = array(
-											"name" => $modversion->mod->name,
-											"version" => $modversion->version,
-											"md5" => $modversion->md5,
-											"pretty_name" => $modversion->mod->pretty_name,
-											"author" => $modversion->mod->author,
-											"description" => $modversion->mod->description,
-											"link" => $modversion->mod->link,
-											"donate" => $modversion->mod->donatelink
-											);
+				$response['mods'] = Cache::get('modpack.'.$slug.'.build.'.$buildpass.'modversion');
 			} else {
-				$data = array(
-											"name" => $modversion->mod->name,
-											"version" => $modversion->version,
-											"md5" => $modversion->md5,
-											);
-				$request = explode(",", Input::get('include'));
-				$mod = (array)$modversion->mod;
-				$mod = $mod['attributes'];
-				foreach ($request as $type)
+				foreach ($build->modversions as $modversion)
 				{
-					if (isset($mod[$type]))
-						$data[$type] = $mod[$type];
+					$response['mods'][] = array(
+												"name" => $modversion->mod->name,
+												"version" => $modversion->version,
+												"md5" => $modversion->md5,
+												"url" => Config::get('solder.mirror_url').'mods/'.$modversion->mod->name.'/'.$modversion->mod->name.'-'.$modversion->version.'.zip'
+												);
 				}
-
-				$response['mods'][] = $data;
+				usort($response['mods'], function($a, $b){return strcasecmp($a['name'], $b['name']);});
+				Cache::put('modpack.'.$slug.'.build.'.$buildpass.'modversion',$response['mods'],5);
 			}
-			
-		}
+		} else if (Input::get('include') == "mods") {
+			if (Cache::has('modpack.'.$slug.'.build.'.$buildpass.'modversion.include.mods') && empty($this->client) && empty($this->key))
+			{
+				$response['mods'] = Cache::get('modpack.'.$slug.'.build.'.$buildpass.'modversion.include.mods');
+			} else {
+				foreach ($build->modversions as $modversion)
+				{
+					$response['mods'][] = array(
+												"name" => $modversion->mod->name,
+												"version" => $modversion->version,
+												"md5" => $modversion->md5,
+												"pretty_name" => $modversion->mod->pretty_name,
+												"author" => $modversion->mod->author,
+												"description" => $modversion->mod->description,
+												"link" => $modversion->mod->link,
+												"donate" => $modversion->mod->donatelink,
+												"url" => Config::get('solder.mirror_url').'mods/'.$modversion->mod->name.'/'.$modversion->mod->name.'-'.$modversion->version.'.zip'
+												);
+				}
+				usort($response['mods'], function($a, $b){return strcasecmp($a['name'], $b['name']);});
+				Cache::put('modpack.'.$slug.'.build.'.$buildpass.'modversion.include.mods',$response['mods'],5);
+			}
+		} else {
+			$request = explode(",", Input::get('include'));
+			if (Cache::has('modpack.'.$slug.'.build.'.$buildpass.'modversion.include.'.$request) && empty($this->client) && empty($this->key))
+			{
+				$response['mods'] = Cache::get('modpack.'.$slug.'.build.'.$buildpass.'modversion.include.'.$request);
+			} else {
+				foreach ($build->modversions as $modversion)
+				{
+					$data = array(
+												"name" => $modversion->mod->name,
+												"version" => $modversion->version,
+												"md5" => $modversion->md5,
+												);
+					$mod = (array)$modversion->mod;
+					$mod = $mod['attributes'];
+					foreach ($request as $type)
+					{
+						if (isset($mod[$type]))
+							$data[$type] = $mod[$type];
+					}
 
-		usort($response['mods'], function($a, $b){return strcasecmp($a['name'], $b['name']);});
+					$response['mods'][] = $data;
+				}
+				usort($response['mods'], function($a, $b){return strcasecmp($a['name'], $b['name']);});
+				Cache::put('modpack.'.$slug.'.build.'.$buildpass.'modversion.include.'.$request,$response['mods'],5);
+			}
+		}
 
 		return $response;
 	}

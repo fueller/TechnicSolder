@@ -8,9 +8,8 @@
 	Create Modpack
 	</div>
 	<div class="panel-body">
-		
 		@if ($errors->all())
-			<div class="alert alert-error">
+			<div class="alert alert-danger">
 			@foreach ($errors->all() as $error)
 				{{ $error }}<br />
 			@endforeach

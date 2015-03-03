@@ -13,9 +13,10 @@ class DashboardController extends BaseController {
 
 		$modversions = Modversion::whereNotNull('md5')->orderBy('updated_at', 'desc')->take(5)->get();
 
-		$changelog = UpdateUtils::getChangeLog();
+		$rawChangeLog = UpdateUtils::getLatestChangeLog();
+		$changelogJson = array_key_exists('error', $rawChangeLog) ? $rawChangeLog : array_slice($rawChangeLog, 0, 10);
 
-		return View::make('dashboard.index')->with('modversions', $modversions)->with('builds', $builds)->with('changelog', $changelog);
+		return View::make('dashboard.index')->with('modversions', $modversions)->with('builds', $builds)->with('changelog', $changelogJson);
 	}
 	
 }
